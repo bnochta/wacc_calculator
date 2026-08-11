@@ -132,6 +132,7 @@ def append_tax_rates(beta_results: pd.DataFrame):
         stat_tax_rates_2.append(stat_rate)
 
     beta_results["Statutory tax rate"] = stat_tax_rates_2
+    return  beta_results
 
 def closest_date(ticker: str, end_date: str):
     """Find closest date relative to the valuation date in yfinance financials"""
@@ -185,6 +186,36 @@ def get_stat_tax_rate(ticker):
     data = pd.read_excel("./data/OECD_statutory_tax_rates/oecd_rates.xlsx", usecols="B:C", names=["country_code","tax_rate"])
     statutory_tax_rates_dict = dict(zip(data["country_code"], data["tax_rate"]))
     return statutory_tax_rates_dict[country_code]
+
+def unlevered_beta(beta_adjustment:str, beta_results:pd.DataFrame, peer_group_beta_method:str):
+    if beta_adjustment == "none":
+        applied_beta = "Raw Betas"
+    elif beta_adjustment == "blume":
+        applied_beta = "Blume adj. beta"
+    elif beta_adjustment == "vasicek":
+        applied_beta = "Vasicek adj. beta"
+    else:
+        raise ValueError("Beta adjustment must be either 'none' / 'blume' / 'vasicek'")
+
+    unlevered_beta_list = []
+
+    for ticker in beta_results["Ticker"]:
+        levered_b = beta_results.loc[beta_results["Ticker"] == ticker, applied_beta].item()
+        tax_rate = beta_results.loc[beta_results["Ticker"] == ticker, "Statutory tax rate"].item()
+        peer_d_e_ratio = beta_results.loc[beta_results["Ticker"] == ticker, "D/E ratio"].item()
+        unlevered_beta = levered_b /(1+(1-tax_rate)*peer_d_e_ratio)
+        unlevered_beta_list.append(unlevered_beta)
+
+    beta_results["Unlevered beta"] = unlevered_beta_list
+
+    if peer_group_beta_method == "average":
+        peer_group_beta = beta_results["Unlevered beta"].mean()
+    elif peer_group_beta_method == "median":
+        peer_group_beta = beta_results["Unlevered beta"].median()
+    else:
+        raise ValueError("Peer group beta method must be either 'average' or 'median'")
+
+    return peer_group_beta
 
 def get_target_levered(target:str, end_date:str, peer_group_beta: float):
     target_country_code = get_country_code_a1(target)
