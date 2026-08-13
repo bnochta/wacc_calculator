@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from functions import *
+import plotly.graph_objects as go
+
 
 st.set_page_config(layout="wide")
 
@@ -137,6 +139,11 @@ if run_clicked:
                             debt_spread=target_spread, relevered_beta=target_levered_beta, erp=equity_risk_premium,
                             sp=size_premium, csrp=comp_spec_risk_premium)
 
+            peers_cumulative = cumulative_returns(return_data=return_data, return_calc=return_calc)
+
+
+            chart_data = peers_cumulative
+
             st.session_state["wacc_results"] = {
                 "beta_results": beta_results,
                 "peer_group_beta": peer_group_beta,
@@ -146,6 +153,7 @@ if run_clicked:
                 "d_e": d_e,
                 "target_tax": target_tax,
                 "wacc": wacc,
+                "chart_data": chart_data,
             }
             st.session_state["wacc_input_hash"] = current_hash
 
@@ -193,6 +201,20 @@ if "wacc_results" in st.session_state:
         col3.markdown(f"###      ")
         col3.divider()
         col3.markdown(f"### {(1 -(1 / (1 + res['d_e']))) * (res['target_rf_rate'] + res['target_spread']) * (1- res['target_tax']):.2%}")
+
+        chart_data = res["chart_data"]
+        fig = go.Figure()
+        colors = {
+            benchmark: "#FDC10F"
+        }
+
+        for col in chart_data.columns:
+            fig.add_trace(go.Scatter(
+                x=chart_data.index,
+                y=chart_data[col],
+                name=col,
+                line=dict(color=colors.get(col), width=3 if col in colors else 1)))
+        st.plotly_chart(fig, use_container_width=True)
 
 
 

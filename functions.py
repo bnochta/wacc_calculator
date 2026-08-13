@@ -283,3 +283,11 @@ def get_wacc(target_ticker: str, end_date: str, rf: float, debt_spread: float, r
     debt_weight = 1 - equity_weight
     target_wacc = (cost_of_equity * equity_weight) + (cost_of_debt * debt_weight) * (1 - target_tax_rate)
     return target_wacc
+
+
+def cumulative_returns(return_data:pd.DataFrame, return_calc:str):
+    if return_calc.lower() == "logarithmic":
+        cumulative = return_data.cumsum()
+    elif return_calc.lower() == "linear":
+        cumulative = (1 + return_data).cumprod() - 1
+    return cumulative
