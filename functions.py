@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 import pycountry
-import requests
+from datetime import datetime
 import os
 from dotenv import load_dotenv
 import fredapi
@@ -32,6 +32,7 @@ RATING_SPREAD_SERIES= {
 }
 
 
+
 #FUNCTIONS
 def download_data(tickers: list[str], start_date: str, end_date:str, interval: str):
     """Download data for the given tickers from Yahoo Finance"""
@@ -54,9 +55,9 @@ def basic_cleaning(close_data:pd.DataFrame):
     return close_data
 
 def log_return_calc(return_calc:str, close_data:pd.DataFrame):
-    if return_calc == "log":
+    if return_calc.lower() == "log":
         return_data = np.log(close_data / close_data.shift(1))
-    elif return_calc == "linear":
+    elif return_calc.lower() == "linear":
         return_data = (close_data / close_data.shift(1)) -1
     else:
         raise ValueError("Return calculation must be either 'log' or 'linear'")
@@ -142,12 +143,31 @@ def closest_date(ticker: str, end_date: str):
     dates = dates.tolist()
     return dates[min_diff].strftime("%Y-%m-%d")
 
+
+def closest_date_v2(date: str):
+    date_year = date[:4]
+
+    if int(date[5:7]) < 10:
+        date_month = date[6:7]
+    else:
+        date_month = date[5:7]
+
+    if int(date[8:10]) < 10:
+        date_day = date[9:10]
+    else:
+        date_day = date[8:10]
+
+    date_v2 = f"{date_month}/{date_day}/{date_year}"
+    return date_v2
+
 def get_d_e_ratio(ticker: str, end_date: str):
     """Calculates D/E ratio for given ticker from yfinance"""
     date = closest_date(ticker, end_date)
     bs = yf.Ticker(ticker).balance_sheet
     total_debt = bs.loc["Total Debt", date]
-    total_equity = bs.loc["Stockholders Equity", date]
+    date_v2 = closest_date_v2(date)
+    val_mes = yf.Ticker(ticker).get_valuation_measures(freq="quarterly", periods=None)
+    total_equity = val_mes.loc["Market Cap", date_v2]
     d_e_ratio = total_debt / total_equity
     return d_e_ratio
 
@@ -188,11 +208,11 @@ def get_stat_tax_rate(ticker):
     return statutory_tax_rates_dict[country_code]
 
 def unlevered_beta(beta_adjustment:str, beta_results:pd.DataFrame, peer_group_beta_method:str):
-    if beta_adjustment == "none":
+    if beta_adjustment.lower() == "none":
         applied_beta = "Raw Betas"
-    elif beta_adjustment == "blume":
+    elif beta_adjustment.lower() == "blume":
         applied_beta = "Blume adj. beta"
-    elif beta_adjustment == "vasicek":
+    elif beta_adjustment.lower() == "vasicek":
         applied_beta = "Vasicek adj. beta"
     else:
         raise ValueError("Beta adjustment must be either 'none' / 'blume' / 'vasicek'")
@@ -208,9 +228,9 @@ def unlevered_beta(beta_adjustment:str, beta_results:pd.DataFrame, peer_group_be
 
     beta_results["Unlevered beta"] = unlevered_beta_list
 
-    if peer_group_beta_method == "average":
+    if peer_group_beta_method.lower() == "average":
         peer_group_beta = beta_results["Unlevered beta"].mean()
-    elif peer_group_beta_method == "median":
+    elif peer_group_beta_method.lower() == "median":
         peer_group_beta = beta_results["Unlevered beta"].median()
     else:
         raise ValueError("Peer group beta method must be either 'average' or 'median'")
@@ -252,3 +272,14 @@ def get_target_spread(interpolated: pd.DataFrame, rating: str, lookback: int):
     target_spreads = interpolated [rating]
     debt_spread = (target_spreads.tail(lookback).mean()) / 100
     return debt_spread
+
+
+def get_wacc(target_ticker: str, end_date: str, rf: float, debt_spread: float, relevered_beta:float, erp:float, sp:float, csrp:float):
+    d_e = get_d_e_ratio(target_ticker, end_date=end_date)
+    target_tax_rate = get_stat_tax_rate(target_ticker)
+    cost_of_equity = rf + (relevered_beta * erp) + sp + csrp
+    equity_weight = 1 / (1 + d_e)
+    cost_of_debt = rf + debt_spread
+    debt_weight = 1 - equity_weight
+    target_wacc = (cost_of_equity * equity_weight) + (cost_of_debt * debt_weight) * (1 - target_tax_rate)
+    return target_wacc
