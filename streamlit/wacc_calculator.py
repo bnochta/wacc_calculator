@@ -109,7 +109,7 @@ if run_clicked:
 
             close_data = basic_cleaning(close_data=close_data)
             
-            return_data = log_return_calc(return_calc=return_calc, close_data= close_data)
+            return_data = return_calc(return_calc=return_calc, close_data= close_data)
 
             beta_results = beta_regression(peer_group=peer_group, return_data=return_data, benchmark=benchmark)
 

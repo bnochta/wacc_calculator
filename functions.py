@@ -54,7 +54,7 @@ def basic_cleaning(close_data:pd.DataFrame):
     close_data = close_data.dropna()
     return close_data
 
-def log_return_calc(return_calc:str, close_data:pd.DataFrame):
+def return_calc_comb(return_calc:str, close_data:pd.DataFrame):
     if return_calc.lower() == "log":
         return_data = np.log(close_data / close_data.shift(1))
     elif return_calc.lower() == "linear":
@@ -170,15 +170,6 @@ def get_d_e_ratio(ticker: str, end_date: str):
     total_equity = val_mes.loc["Market Cap", date_v2]
     d_e_ratio = total_debt / total_equity
     return d_e_ratio
-
-def get_eff_tax_r(ticker: str):
-    """Calculates effective tax ratio for given ticker from yfinance"""
-    fin = yf.Ticker(ticker).financials
-    tax_prov = fin.loc["Tax Provision"].dropna().to_list()
-    pretax_inc = fin.loc["Pretax Income"].dropna().to_list()
-    eff_t_rate = [a / b for a, b in zip(tax_prov, pretax_inc)]
-    avg_tax = sum(eff_t_rate) / len(eff_t_rate)
-    return avg_tax
 
 def get_country_code_a1(ticker):
     """Find the alpha_3 style country code for given ticker"""
